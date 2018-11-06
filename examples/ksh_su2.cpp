@@ -169,12 +169,13 @@ int main(int argc, char **argv) {
 
   int err = 0;
 
-  if (argc != 2) {
-    std::cout << argv[0] << " <maxR>";
+  if (argc != 3) {
+    std::cout << argv[0] << " <filename> <maxR>";
     exit(0);
   }
 
-  const int maxR = std::atoi(argv[1]);
+  const std::string fnprefix = std::string(argv[1]);
+  const int maxR = std::atoi(argv[2]);
 
   auto H = SUNCG::Space::SUN_HilbertSpace<2>(maxR);
   auto opN = SUNCG::Operator::operatorN<double>(H);
@@ -319,39 +320,58 @@ int main(int argc, char **argv) {
     std::cout << "}" << std::endl;
   }
 
-  std::string filename = "hamiltonian2_" + std::to_string(maxR) + ".hdf5";
+  std::string filename = fnprefix + "-" + std::to_string(maxR) + ".hdf5";
   Storage::Storage storage(filename, Storage::FileMode::CreateOverwrite);
 
   storage.create_group("/HilbertSpace");
   storage.create("/HilbertSpace", Storage::Data::Metadata<unsigned int>{"dimension", dimH});
   {
     storage.create_group("/HilbertSpace/Operator/E2");
+    storage.create("/HilbertSpace/Operator/E2", Storage::Data::Metadata<unsigned long>{"size", 1});
     Storage::Data::Dense<double> dense{TE.dimension(), TE.size()};
     TE.writeTo(dense.data.get());
     storage.create("/HilbertSpace/Operator/E2/0", dense);
   }
   {
     storage.create_group("/HilbertSpace/Operator/F2");
+    storage.create("/HilbertSpace/Operator/F2", Storage::Data::Metadata<unsigned long>{"size", 1});
     Storage::Data::Dense<double> dense{TF.dimension(), TF.size()};
     TF.writeTo(dense.data.get());
     storage.create("/HilbertSpace/Operator/F2/0", dense);
   }
   {
     storage.create_group("/HilbertSpace/Operator/N");
+    storage.create("/HilbertSpace/Operator/N", Storage::Data::Metadata<unsigned long>{"size", 1});
     Storage::Data::Dense<double> dense{TN.dimension(), TN.size()};
     TF.writeTo(dense.data.get());
     storage.create("/HilbertSpace/Operator/N/0", dense);
   }
   storage.create_group("/HilbertSpace/Operator/U");
+  storage.create("/HilbertSpace/Operator/U", Storage::Data::Metadata<unsigned long>{"size", uv.size()});
   for (unsigned int n = 0; n < uv.size(); n++) {
     Storage::Data::Dense<double> dense{uv[n][0].dimension(), uv[n][0].size()};
     uv[n][0].writeTo(dense.data.get());
     storage.create("/HilbertSpace/Operator/U/" + std::to_string(n), dense);
   }
   storage.create_group("/HilbertSpace/Operator/V");
+  storage.create("/HilbertSpace/Operator/V", Storage::Data::Metadata<unsigned long>{"size", uv.size()});
   for (unsigned int n = 0; n < uv.size(); n++) {
     Storage::Data::Dense<double> dense{uv[n][1].dimension(), uv[n][1].size()};
     uv[n][1].writeTo(dense.data.get());
     storage.create("/HilbertSpace/Operator/V/" + std::to_string(n), dense);
+  }
+  storage.create_group("/HilbertSpace/Operator/L");
+  storage.create("/HilbertSpace/Operator/L", Storage::Data::Metadata<unsigned long>{"size", lr.size()});
+  for (unsigned int n = 0; n < lr.size(); n++) {
+    Storage::Data::Dense<double> dense{lr[n][0].dimension(), lr[n][0].size()};
+    lr[n][0].writeTo(dense.data.get());
+    storage.create("/HilbertSpace/Operator/L/" + std::to_string(n), dense);
+  }
+  storage.create_group("/HilbertSpace/Operator/R");
+  storage.create("/HilbertSpace/Operator/R", Storage::Data::Metadata<unsigned long>{"size", lr.size()});
+  for (unsigned int n = 0; n < lr.size(); n++) {
+    Storage::Data::Dense<double> dense{lr[n][1].dimension(), lr[n][1].size()};
+    lr[n][1].writeTo(dense.data.get());
+    storage.create("/HilbertSpace/Operator/R/" + std::to_string(n), dense);
   }
 }
