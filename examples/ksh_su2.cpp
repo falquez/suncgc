@@ -162,6 +162,42 @@ namespace SUNCG::Operator {
     std::string name() const { return std::string("operatorP2"); }
   };
 
+  template <typename F>
+  class operatorPE0 : public VectorOperator<Singlet<2>, F> {
+  public:
+    operatorPE0(const HilbertSpace<Singlet<2>> &space) : VectorOperator<Singlet<2>, F>{space} {}
+    std::vector<Vector<F>> operator()(const Vector<F> &ket) const {
+      std::vector<Vector<F>> result;
+
+      // Read the charges
+      const auto [F1, Q1, E1] = this->space[ket[0]].charges();
+
+      if (E1 == 0)
+        result.push_back(Vector<F>({ket[0]}, 1.0));
+
+      return result;
+    }
+    std::string name() const { return std::string("PE0"); }
+  };
+
+  template <typename F>
+  class operatorPF0 : public VectorOperator<Singlet<2>, F> {
+  public:
+    operatorPF0(const HilbertSpace<Singlet<2>> &space) : VectorOperator<Singlet<2>, F>{space} {}
+    std::vector<Vector<F>> operator()(const Vector<F> &ket) const {
+      std::vector<Vector<F>> result;
+
+      // Read the charges
+      const auto [F1, Q1, E1] = this->space[ket[0]].charges();
+
+      if (F1 == 0)
+        result.push_back(Vector<F>({ket[0]}, 1.0));
+
+      return result;
+    }
+    std::string name() const { return std::string("PF0"); }
+  };
+
 } // namespace SUNCG::Operator
 
 int main(int argc, char **argv) {
@@ -183,17 +219,23 @@ int main(int argc, char **argv) {
   auto opF = SUNCG::Operator::operatorF<double>(H);
   auto opW = SUNCG::Operator::operatorW2<double>(H);
   auto opP = SUNCG::Operator::operatorP2<double>(H);
+  auto opPE0 = SUNCG::Operator::operatorPE0<double>(H);
+  auto opPF0 = SUNCG::Operator::operatorPF0<double>(H);
 
   auto dimH = H.dimension();
 
   std::cout << "dimH=" << dimH << std::endl;
   for (int i = 0; i < dimH; i++) {
-    std::cout << H[i] << std::endl;
+    std::cout << i << ":" << H[i] << std::endl;
   }
 
   Tensor::Tensor<double> TN({dimH, dimH});
   Tensor::Tensor<double> TE({dimH, dimH});
   Tensor::Tensor<double> TF({dimH, dimH});
+
+  Tensor::Tensor<double> TPE0({dimH, dimH});
+  Tensor::Tensor<double> TPF0({dimH, dimH});
+
   Tensor::Tensor<double> TW({dimH, dimH, dimH, dimH});
   Tensor::Tensor<double> TP({dimH, dimH, dimH, dimH});
 
@@ -206,6 +248,10 @@ int main(int argc, char **argv) {
         TE[{i1, i2}] = *v;
       if (auto v = v1 * opF(v2))
         TF[{i1, i2}] = *v;
+      if (auto v = v1 * opPE0(v2))
+        TPE0[{i1, i2}] = *v;
+      if (auto v = v1 * opPF0(v2))
+        TPF0[{i1, i2}] = *v;
     }
   }
 
@@ -226,6 +272,9 @@ int main(int argc, char **argv) {
   std::cout << TN << std::endl;
   std::cout << TE << std::endl;
   std::cout << TF << std::endl;
+  std::cout << TP << std::endl;
+  std::cout << TPE0 << std::endl;
+  std::cout << TPF0 << std::endl;
 
   auto W2 = TW + TW.conjugate().transpose({2, 3, 0, 1});
   // M = AxB
@@ -246,6 +295,7 @@ int main(int argc, char **argv) {
       }
     }
   }
+
   std::cout << "P=" << std::endl;
   for (unsigned int i1 = 0; i1 < dimH; i1++) {
     for (unsigned int j1 = 0; j1 < dimH; j1++) {
@@ -326,6 +376,13 @@ int main(int argc, char **argv) {
   storage.create_group("/HilbertSpace");
   storage.create("/HilbertSpace", Storage::Data::Metadata<unsigned int>{"dimension", dimH});
   {
+    storage.create_group("/HilbertSpace/Operator/P");
+    storage.create("/HilbertSpace/Operator/P", Storage::Data::Metadata<unsigned long>{"size", 1});
+    Storage::Data::Dense<double> dense{TP.dimension(), TP.size()};
+    TP.writeTo(dense.data.get());
+    storage.create("/HilbertSpace/Operator/P/0", dense);
+  }
+  {
     storage.create_group("/HilbertSpace/Operator/E2");
     storage.create("/HilbertSpace/Operator/E2", Storage::Data::Metadata<unsigned long>{"size", 1});
     Storage::Data::Dense<double> dense{TE.dimension(), TE.size()};
@@ -343,8 +400,22 @@ int main(int argc, char **argv) {
     storage.create_group("/HilbertSpace/Operator/N");
     storage.create("/HilbertSpace/Operator/N", Storage::Data::Metadata<unsigned long>{"size", 1});
     Storage::Data::Dense<double> dense{TN.dimension(), TN.size()};
-    TF.writeTo(dense.data.get());
+    TN.writeTo(dense.data.get());
     storage.create("/HilbertSpace/Operator/N/0", dense);
+  }
+  {
+    storage.create_group("/HilbertSpace/Operator/PE0");
+    storage.create("/HilbertSpace/Operator/PE0", Storage::Data::Metadata<unsigned long>{"size", 1});
+    Storage::Data::Dense<double> dense{TPE0.dimension(), TPE0.size()};
+    TPE0.writeTo(dense.data.get());
+    storage.create("/HilbertSpace/Operator/PE0/0", dense);
+  }
+  {
+    storage.create_group("/HilbertSpace/Operator/PF0");
+    storage.create("/HilbertSpace/Operator/PF0", Storage::Data::Metadata<unsigned long>{"size", 1});
+    Storage::Data::Dense<double> dense{TPF0.dimension(), TPF0.size()};
+    TPF0.writeTo(dense.data.get());
+    storage.create("/HilbertSpace/Operator/PF0/0", dense);
   }
   storage.create_group("/HilbertSpace/Operator/U");
   storage.create("/HilbertSpace/Operator/U", Storage::Data::Metadata<unsigned long>{"size", uv.size()});
