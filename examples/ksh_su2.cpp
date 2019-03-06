@@ -22,6 +22,8 @@
 #include <TNT/tensor/sparse/tensor.h>
 #include <TNT/tensor/tensor.h>
 
+#include <optional>
+
 namespace SUNCG::Operator {
   using namespace SUNCG::Space;
 
@@ -141,8 +143,11 @@ namespace SUNCG::Operator {
 
   template <typename F>
   class operatorP2 : public VectorOperator<Singlet<2>, F> {
+    std::optional<int> R;
+
   public:
-    operatorP2(const HilbertSpace<Singlet<2>> &space) : VectorOperator<Singlet<2>, F>{space} {}
+    operatorP2(const HilbertSpace<Singlet<2>> &space, std::optional<int> R = {})
+        : VectorOperator<Singlet<2>, F>{space}, R{R} {}
     std::vector<Vector<F>> operator()(const Vector<F> &ket) const {
       std::vector<Vector<F>> result;
 
@@ -154,8 +159,14 @@ namespace SUNCG::Operator {
       const auto [F1, Q1, E1] = u1.charges();
       const auto [F2, Q2, E2] = u2.charges();
 
-      if (E1 == F2)
-        result.push_back(Vector<F>({ket[0], ket[1]}, 1.0));
+      if (E1 == F2) {
+        if (R) {
+          if (*R == E1)
+            result.push_back(Vector<F>({ket[0], ket[1]}, 1.0));
+        } else {
+          result.push_back(Vector<F>({ket[0], ket[1]}, 1.0));
+        }
+      }
 
       return result;
     }
@@ -206,7 +217,7 @@ int main(int argc, char **argv) {
   int err = 0;
 
   if (argc != 3) {
-    std::cout << argv[0] << " <filename> <maxR>";
+    std::cout << argv[0] << " <filename> <maxR>" << std::endl;
     exit(0);
   }
 
@@ -375,12 +386,31 @@ int main(int argc, char **argv) {
 
   storage.create_group("/HilbertSpace");
   storage.create("/HilbertSpace", Storage::Data::Metadata<unsigned int>{"dimension", dimH});
+
   {
-    storage.create_group("/HilbertSpace/Operator/P");
-    storage.create("/HilbertSpace/Operator/P", Storage::Data::Metadata<unsigned long>{"size", 1});
-    Storage::Data::Dense<double> dense{TP.dimension(), TP.size()};
-    TP.writeTo(dense.data.get());
-    storage.create("/HilbertSpace/Operator/P/0", dense);
+    storage.create_group("/HilbertSpace/Operator/PE");
+    storage.create("/HilbertSpace/Operator/PE",
+                   Storage::Data::Metadata<unsigned long>{"size", static_cast<unsigned long>(maxR)});
+
+    for (int R = 0; R < maxR; R++) {
+      Tensor::Tensor<double> TP({dimH, dimH, dimH, dimH});
+      auto opP = SUNCG::Operator::operatorP2<double>(H, R);
+
+      for (unsigned int i1 = 0; i1 < dimH; i1++) {
+        for (unsigned int j1 = 0; j1 < dimH; j1++) {
+          for (unsigned int i2 = 0; i2 < dimH; i2++) {
+            for (unsigned int j2 = 0; j2 < dimH; j2++) {
+              SUNCG::Space::Vector<double> v1({i1, j1}), v2({i2, j2});
+              if (auto v = v1 * opP(v2))
+                TP[{i1, j1, i2, j2}] = *v;
+            }
+          }
+        }
+      }
+      Storage::Data::Dense<double> dense{TP.dimension(), TP.size()};
+      TP.writeTo(dense.data.get());
+      storage.create("/HilbertSpace/Operator/PE/" + std::to_string(R), dense);
+    }
   }
   {
     storage.create_group("/HilbertSpace/Operator/E2");
