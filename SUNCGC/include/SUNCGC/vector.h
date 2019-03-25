@@ -15,8 +15,8 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef VECTOR_H
-#define VECTOR_H
+#ifndef _SUNCGC_VECTOR_H
+#define _SUNCGC_VECTOR_H
 
 #include <array>
 #include <optional>
@@ -67,4 +67,4 @@ namespace SUNCG::Space {
   std::ostream &operator<<(std::ostream &out, const Vector<F> &t);
 } // namespace SUNCG::Space
 
-#endif // VECTOR_H
+#endif // _SUNCGC_VECTOR_H
